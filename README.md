@@ -168,6 +168,8 @@ definitions:
         type: number
       source:
         type: string
+      paymentId:
+        type: string
       TransctionRemarks:
         type: string
   #resposne
