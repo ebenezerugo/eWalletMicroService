@@ -13,10 +13,14 @@ class Wallet(models.Model):
     currency_id = models.ForeignKey(Currency, on_delete=models.CASCADE)
     user_id = models.CharField(max_length=24)
     wallet_id = models.CharField(max_length=32, primary_key=True)
+    wallet_created_date_and_time = models.DateTimeField()
     current_balance = models.FloatField()
 
     def __str__(self):
         return self.wallet_id
+
+    class Meta:
+        ordering = ('wallet_created_date_and_time',)
 
 
 class TransactionType(models.Model):
@@ -33,7 +37,8 @@ class Transaction(models.Model):
     payment_id = models.CharField(max_length=32)
     source = models.CharField(max_length=100)
     transaction_type = models.ForeignKey(TransactionType, on_delete=models.CASCADE)
-    transaction_date_and_time = models.DateTimeField()
+    transaction_date = models.DateField()
+    transaction_time = models.TimeField()
     previous_balance = models.FloatField()
     transaction_amount = models.FloatField()
     current_balance = models.FloatField()
