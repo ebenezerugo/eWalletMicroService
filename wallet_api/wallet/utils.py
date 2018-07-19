@@ -1,7 +1,7 @@
 from hashlib import md5
 from rest_framework.parsers import JSONParser
-from .models import *
 from datetime import datetime
+from .serializers import *
 
 
 def get_hash_string(*args):
@@ -29,3 +29,31 @@ def get_transaction_data(request):
     data['transaction_time'] = datetime.now().time()
     data['previous_balance'] = Wallet.objects.get(wallet_id=data['wallet_id']).current_balance
     return data
+
+
+def get_transactions(filters):
+    transaction_objects = Transaction.objects
+    transactions = list()
+
+    if 'start_date' in filters.keys():
+        start_date = datetime.strptime(filters['start_date'], '%Y-%m-%d').date()
+        if 'end_date' in filters.keys():
+            end_date = datetime.strptime(filters['end_date'], '%Y-%m-%d').date()
+        else:
+            end_date = start_date
+        transaction_objects = transaction_objects.filter(transaction_date__range=(start_date, end_date))
+
+    if 'user_id' in filters.keys():
+        wallets = Wallet.objects.filter(user_id=filters['user_id'])
+        if not wallets:
+            transaction_objects = transaction_objects.none()
+        for wallet in wallets:
+            transaction_objects = transaction_objects.filter(wallet_id=wallet.wallet_id)
+
+    if 'transaction_type' in filters.keys():
+        transaction_type = TransactionType.objects.get(type_name=filters['transaction_type']).type_id
+        transaction_objects = transaction_objects.filter(transaction_type=transaction_type)
+
+    for transaction in transaction_objects.all():
+        transactions.append(TransactionSerializer(transaction).data)
+    return transactions

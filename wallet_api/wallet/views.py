@@ -1,9 +1,7 @@
 from django.views.decorators.csrf import csrf_exempt
-from .serializers import *
 from django.http import JsonResponse
 from rest_framework import status
 from .utils import *
-from .models import *
 
 
 @csrf_exempt
@@ -66,6 +64,22 @@ def debit(request):
 
 
 @csrf_exempt
+def transactions(request):
+    if request.method == 'POST':
+        try:
+            filters = JSONParser().parse(request)
+        except:
+            filters = dict()
+        curated_transactions = get_transactions(filters)
+        context = {
+            'transactions': curated_transactions,
+            'message': 'Found ' + str(len(curated_transactions)) + ' transactions',
+            'request_status': 1
+        }
+        return JsonResponse(context, status=status.HTTP_200_OK)
+
+
+@csrf_exempt
 def user_wallets(request):
     if request.method == 'GET':
         user_id = request.GET.get('user_id')
@@ -94,39 +108,4 @@ def current_balance_in_wallet(request):
             'message': 'Retrieved current balance',
             'request_status': 1
         }
-        return JsonResponse(context, status=status.HTTP_200_OK)
-
-
-@csrf_exempt
-def transactions(request):
-    if request.method == 'POST':
-        try:
-            filters = JSONParser().parse(request)
-        except:
-            filters = dict()
-        transaction_objects = Transaction.objects
-        transactions = list()
-
-        if 'start_date' in filters.keys():
-            start_date = datetime.strptime(filters['start_date'], '%Y-%m-%d').date()
-            if 'end_date' in filters.keys():
-                end_date = datetime.strptime(filters['end_date'], '%Y-%m-%d').date()
-            else:
-                end_date = start_date
-            transaction_objects = transaction_objects.filter(transaction_date__range=(start_date, end_date))
-
-        if 'user_id' in filters.keys():
-            wallets = Wallet.objects.filter(user_id=filters['user_id'])
-            if not wallets:
-                transaction_objects = transaction_objects.none()
-            for wallet in wallets:
-                transaction_objects = transaction_objects.filter(wallet_id=wallet.wallet_id)
-
-        if 'transaction_type' in filters.keys():
-            transaction_type = TransactionType.objects.get(type_name=filters['transaction_type']).type_id
-            transaction_objects = transaction_objects.filter(transaction_type=transaction_type)
-
-        for transaction in transaction_objects.all():
-            transactions.append(TransactionSerializer(transaction).data)
-        context = {'transactions': transactions}
         return JsonResponse(context, status=status.HTTP_200_OK)
