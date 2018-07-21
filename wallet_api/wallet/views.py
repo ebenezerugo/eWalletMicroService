@@ -30,6 +30,7 @@ def create_wallet(request):
 @csrf_exempt
 def credit(request):
     if request.method == 'PUT':
+        context = dict()
         data = get_transaction_data(request)
         if 'error' in data.keys():
             context = {
@@ -38,6 +39,15 @@ def credit(request):
             }
             return JsonResponse(context, status=status.HTTP_400_BAD_REQUEST)
         data['current_balance'] = data['previous_balance'] + data['transaction_amount']
+        currency = Wallet.objects.filter(wallet_id=data['wallet_id'])[0].currency_id_id
+        limit = Currency.objects.filter(currency_id=currency)[0].currency_limit
+        if data['current_balance'] > limit:
+            context = {
+                'current_balance': data['previous_balance'],
+                'message': 'Credit failed due to currency limit',
+                'request_status': 0
+            }
+            return JsonResponse(context, status=status.HTTP_200_OK)
         data['transaction_type'] = TransactionType.objects.get(type_name='CREDIT').type_id
         serializer = TransactionSerializer(data=data)
         if serializer.is_valid():
@@ -55,6 +65,7 @@ def credit(request):
 @csrf_exempt
 def debit(request):
     if request.method == 'PUT':
+        context = dict()
         data = get_transaction_data(request)
         if 'error' in data.keys():
             context = {
@@ -62,13 +73,13 @@ def debit(request):
                 'request_status': 0
             }
             return JsonResponse(context, status=status.HTTP_400_BAD_REQUEST)
-        context = {
-            'current_balance': data['previous_balance'],
-            'message': 'Debit failed due to insufficient funds',
-            'request_status': 0
-        }
         data['current_balance'] = data['previous_balance'] - data['transaction_amount']
         if data['current_balance'] < 0:
+            context = {
+                'current_balance': data['previous_balance'],
+                'message': 'Debit failed due to insufficient funds',
+                'request_status': 0
+            }
             return JsonResponse(context, status=status.HTTP_200_OK)
         data['transaction_type'] = TransactionType.objects.get(type_name='DEBIT').type_id
         serializer = TransactionSerializer(data=data)
