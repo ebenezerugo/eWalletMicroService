@@ -1,11 +1,16 @@
 [
   {
     "currency_name": "INR",
-    "limit": 500,
+    "limit": 1500,
     "active": 1
   },
   {
     "currency_name": "USD",
+    "limit": 200,
+    "active": 1
+  },
+  {
+    "currency_name": "EUR",
     "limit": 200,
     "active": 1
   }

@@ -1,179 +1,97 @@
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from rest_framework import status
+from django.views.decorators.http import require_http_methods
+from rest_framework.parsers import JSONParser
 from .utils import *
-from django.db import transaction
 
 
+@require_http_methods(['POST'])
 @csrf_exempt
 def create_wallet(request):
-    if request.method == 'POST':
-        data = get_wallet_creation_data(request)
-        if 'error' in data.keys():
-            context = {
-                'message': data['error'],
-                'request_status': 0
-            }
-            return JsonResponse(context, status=status.HTTP_400_BAD_REQUEST)
-        serializer = WalletSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            context = {
-                'wallet_id': serializer.data['wallet_id'],
-                'message': 'Wallet created',
-                'requestStatus': 1
-            }
-            return JsonResponse(context, status=status.HTTP_201_CREATED)
-        return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    data = get_wallet_creation_data(JSONParser().parse(request))
+    if 'error' in data.keys():
+        context = get_context(message=data['error'], request_status=0)
+        return JsonResponse(context, status=status.HTTP_400_BAD_REQUEST)
+    serializer = WalletSerializer(data=data)
+    if serializer.is_valid():
+        serializer.save()
+        context = get_context(wallet_id=serializer.data['wallet_id'], message='wallet_created', request_status=0)
+        return JsonResponse(context, status=status.HTTP_201_CREATED)
+    return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@require_http_methods(['PUT'])
 @csrf_exempt
-def credit(request):
-    if request.method == 'PUT':
-        context = dict()
-        data = get_transaction_data(request)
-        if 'error' in data.keys():
-            context = {
-                'message': data['error'],
-                'request_status': 0
-            }
-            return JsonResponse(context, status=status.HTTP_400_BAD_REQUEST)
-        data['current_balance'] = data['previous_balance'] + data['transaction_amount']
-        currency = Wallet.objects.filter(wallet_id=data['wallet_id'])[0].currency_id_id
-        limit = Currency.objects.filter(currency_id=currency)[0].currency_limit
-        if data['current_balance'] > limit:
-            context = {
-                'current_balance': data['previous_balance'],
-                'message': 'Credit failed due to currency limit',
-                'request_status': 0
-            }
+def transact(request):
+    transaction_type = str(request.get_full_path().split('/')[-2]).upper()
+    data = get_transaction_data(JSONParser().parse(request), transaction_type)
+    if 'error' in data.keys():
+        context = get_context(message=data['error'], request_status=0)
+        return JsonResponse(context, status=status.HTTP_400_BAD_REQUEST)
+    context = get_context(current_balance=data['previous_balance'], message='', request_status=0)
+    if transaction_type == 'CREDIT':
+        if check_limit(data):
+            context['message'] = 'Credit failed due to currency limit'
             return JsonResponse(context, status=status.HTTP_200_OK)
-        data['transaction_type'] = TransactionType.objects.get(type_name='CREDIT').type_id
-        serializer = TransactionSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            Wallet.objects.filter(wallet_id=data['wallet_id']).update(current_balance=data['current_balance'])
-            context = {
-                'current_balance': data['current_balance'],
-                'message': 'Credit successful',
-                'request_status': 1
-            }
-            return JsonResponse(context, status=status.HTTP_200_OK)
-        return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@csrf_exempt
-def debit(request):
-    if request.method == 'PUT':
-        context = dict()
-        data = get_transaction_data(request)
-        if 'error' in data.keys():
-            context = {
-                'message': data['error'],
-                'request_status': 0
-            }
-            return JsonResponse(context, status=status.HTTP_400_BAD_REQUEST)
-        data['current_balance'] = data['previous_balance'] - data['transaction_amount']
+    elif transaction_type == 'DEBIT':
         if data['current_balance'] < 0:
-            context = {
-                'current_balance': data['previous_balance'],
-                'message': 'Debit failed due to insufficient funds',
-                'request_status': 0
-            }
+            context['message'] = 'Debit failed due to insufficient funds'
             return JsonResponse(context, status=status.HTTP_200_OK)
-        data['transaction_type'] = TransactionType.objects.get(type_name='DEBIT').type_id
-        serializer = TransactionSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            Wallet.objects.filter(wallet_id=data['wallet_id']).update(current_balance=data['current_balance'])
-            context['current_balance'] = data['current_balance']
-            context['message'] = "Debit successful"
-            context['request_status'] = 1
-            return JsonResponse(context, status=status.HTTP_200_OK)
-        return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return make_transaction(data, transaction_type)
 
 
+@require_http_methods(['POST'])
 @csrf_exempt
 def transactions(request):
-    if request.method == 'POST':
-        try:
-            filters = JSONParser().parse(request)
-        except:
-            filters = dict()
-        curated_transactions = get_transactions(filters)
-        context = {
-            'transactions': curated_transactions,
-            'message': 'Found ' + str(len(curated_transactions)) + ' transactions',
-            'request_status': 1
-        }
-        return JsonResponse(context, status=status.HTTP_200_OK)
+    filters = JSONParser().parse(request)
+    curated_transactions = get_transactions(filters)
+    context = get_context(transactions=curated_transactions,
+                          message='Found ' + str(len(curated_transactions)) + ' transactions', request_status=1)
+    return JsonResponse(context, status=status.HTTP_200_OK)
 
 
+@require_http_methods(['GET'])
 @csrf_exempt
 def user_wallets(request):
-    if request.method == 'GET':
-        user_id = request.GET.get('user_id')
-        wallets = list()
-        for wallet in Wallet.objects.filter(user_id=user_id):
-            wallets.append({
-                'wallet_id': wallet.wallet_id,
-                'current_balance': wallet.current_balance
-            })
-        context = {
-            'wallets': wallets,
-            'message': 'Found ' + str(len(wallets)) + ' wallets',
-            'request_status': 1
-        }
-        return JsonResponse(context, status=status.HTTP_200_OK)
+    user_id = request.GET.get('user_id')
+    wallets = get_wallets(user_id)
+    context = get_context(wallets=wallets, message='Found ' + str(len(wallets)) + ' wallets', request_status=1)
+    return JsonResponse(context, status=status.HTTP_200_OK)
 
 
+@require_http_methods(['GET'])
 @csrf_exempt
 def current_balance_in_wallet(request):
     if request.method == 'GET':
         user_id = request.GET.get('user_id')
         currency = request.GET.get('currency')
-        wallet_id = get_hash_string(user_id, currency)
-        current_balance = Wallet.objects.get(wallet_id=wallet_id).current_balance
-        context = {
-            'current_balance': current_balance,
-            'message': 'Retrieved current balance',
-            'request_status': 1
-        }
+        current_balance = get_current_balance(user_id, currency)
+        context = get_context(current_balance=current_balance, message='Retrieved current balance', request_status=1)
         return JsonResponse(context, status=status.HTTP_200_OK)
 
 
+@require_http_methods(['GET'])
 @csrf_exempt
 def allowed_currencies(request):
-    if request.method == 'GET':
-        currencies = list(Currency.objects.values_list('currency_name', flat=True))
-        context = {'allowed_currencies': currencies}
-        return JsonResponse(context, status=status.HTTP_200_OK)
+    currencies = list(Currency.objects.values_list('currency_name', flat=True))
+    context = get_context(allowed_currencies=currencies)
+    return JsonResponse(context, status=status.HTTP_200_OK)
 
 
+@require_http_methods(['PUT'])
 @csrf_exempt
 def wallet_status(request):
-    if request.method == 'PUT':
-        data = JSONParser().parse(request)
-        wallet_id = get_hash_string(data['user_id'], data['currency'])
-        action = str(request.get_full_path().split('/')[-2])
-        if action == 'activate':
-            Wallet.objects.filter(wallet_id=wallet_id).update(active=True)
-            context = {
-                'message': 'wallet has been activated',
-                'request_status': 1
-            }
-        elif action == 'deactivate':
-            Wallet.objects.filter(wallet_id=wallet_id).update(active=True)
-            context = {
-                'message': 'wallet has been deactivated',
-                'request_status': 1
-            }
-        else:
-            context = {
-                'message': 'action failed',
-                'request_status': 0
-            }
-        return JsonResponse(context, status=status.HTTP_200_OK)
+    data = JSONParser().parse(request)
+    wallet_id = get_hash_string(data['user_id'], data['currency'])
+    action = str(request.get_full_path().split('/')[-2])
+    if action == 'activate':
+        Wallet.objects.filter(wallet_id=wallet_id).update(active=True)
+        context = get_context(message='wallet has been activated', request_status=1)
+    elif action == 'deactivate':
+        Wallet.objects.filter(wallet_id=wallet_id).update(active=False)
+        context = get_context(message='wallet has been deactivated', request_status=1)
+    else:
+        context = get_context(message='action failed', request_status=0)
+    return JsonResponse(context, status=status.HTTP_200_OK)
 
 
 @csrf_exempt
@@ -187,13 +105,18 @@ def update_currencies(request):
         }
         with transaction.atomic():
             for currency_item in currencies:
-                currency_object = Currency.objects.filter(currency_name=currency_item['currency_name'])
-                if currency_object.exists():
-                    wallets = Wallet.objects.filter(currency_id=currency_object[0].currency_id)
+                try:
+                    currency_object = Currency.objects.get(currency_name=currency_item['currency_name'])
+                except:
+                    currency_object = None
+                print(currency_object)
+                if currency_object:
+                    wallets = Wallet.objects.filter(currency_id=currency_object.currency_id)
 
-                    if currency_item['active'] != currency_object[0].active:
+                    if currency_item['active'] != currency_object.active:
                         if not wallets.count() or data['status_hard']:
-                            currency_object.update(active=bool(currency_item['active']))
+                            currency_object.active = bool(currency_item['active'])
+                            currency_object.save()
                         else:
                             context = dict()
                             context['currency_status'] = {
@@ -202,10 +125,11 @@ def update_currencies(request):
                                 'request_status': 0
                             }
 
-                    if currency_item['limit'] != currency_object[0].currency_limit:
+                    if currency_item['limit'] != currency_object.currency_limit:
                         wallets = wallets.filter(current_balance__gt=currency_item['limit'])
                         if not wallets.count() or data['limit_hard']:
-                            currency_object.update(currency_limit=currency_item['limit'])
+                            currency_object.currency_limit = currency_item['limit']
+                            currency_object.save()
                         else:
                             context = dict()
                             context['currency_limit'] = {
