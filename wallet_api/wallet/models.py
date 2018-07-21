@@ -4,6 +4,8 @@ from django.db import models
 class Currency(models.Model):
     currency_id = models.AutoField(primary_key=True)
     currency_name = models.CharField(max_length=100)
+    currency_limit = models.FloatField()
+    active = models.BooleanField()
 
     def __str__(self):
         return self.currency_name
@@ -15,6 +17,7 @@ class Wallet(models.Model):
     wallet_id = models.CharField(max_length=32, primary_key=True)
     wallet_created_date_and_time = models.DateTimeField()
     current_balance = models.FloatField()
+    active = models.BooleanField()
 
     def __str__(self):
         return self.wallet_id

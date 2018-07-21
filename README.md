@@ -8,7 +8,7 @@
 ![](images/schemadesign.png?raw=true)
 
 ### API documention snippet from Swagger
-``` json
+``` javascript
 swagger: '2.0'
 info:
   version: 0.0.0
@@ -24,9 +24,7 @@ paths:
       summary: Create user wallet
       description: >-
         Create a wallet for the user for specified currency and return the
-        wallet Id.
-      produces:
-        - application/json
+        wallet Id
       parameters:
         - in: body
           name: create_wallet
@@ -41,8 +39,6 @@ paths:
     put:
       summary: Credit to user wallet
       description: Credit the specified amount in the user's wallet
-      produces:
-        - application/json
       parameters:
         - in: body
           name: credit
@@ -57,8 +53,6 @@ paths:
     put:
       summary: Debit from user wallet
       description: Debit the specified amount from thr user's wallet
-      produces:
-        - application/json
       parameters:
         - in: body
           name: debit
@@ -69,15 +63,28 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Balance'
-  '/user/wallets/{userId}':
+  /transactions:
+    post:
+      summary: Returns transactions
+      description: Returns list of all or filtered transactions in detail
+      parameters: 
+        - in: body
+          name: filters
+          description: filters necessary to filter the transactions
+          schema:
+            $ref: '#/definitions/Filters'
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/Transactions'
+  '/user/wallets':
     get:
       summary: Returns current user's wallets
       description: Returns the list  of wallets owned by the current user
-      produces:
-        - application/json
       parameters:
-      - in : path
-        name: userId
+      - in : query
+        name: user_id
         description: The Id of the current user
         type: string
         required: true
@@ -86,14 +93,19 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/UserWallets'
-  '/user/balance/{walletId}':
+  '/user/balance':
     get:
       summary: Retruns balance amount is user's wallet
       description: Returns the balance amount in the current user's specified wallet
       parameters:
-        - in: path
-          name: walletId
+        - in: query
+          name: user_id
           description: The Id of the current user's desired wallet
+          required: true
+          type: string
+        - in: query
+          name: currenncy
+          description: The currency of the wallet
           required: true
           type: string
       responses:
@@ -101,47 +113,66 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Balance'
-  '/user/transactions/{userId}':
+  /allowed_currencies:
     get:
-      summary: Returns the user's transaction log
-      description: Returns a detailed log of the current user's transactions
-      parameters:
-        - in: path
-          name: userId
-          description: The Id of the current user
-          required: true
-          type: string
+      summary: Returns allowed currencies
+      description: Returns a list of allowed currencies
       responses:
-        '200':
+        200:
           description: OK
           schema:
-            $ref: '#/definitions/Transactions'
-  '/admin/transactions/{filters}':
-    get:
-      summary: Returns filtered transaction log
-      description: Returns a detailed log of transctions based on the specified filters
+            $ref: '#/definitions/Currencies'
+  /activate:
+    put:
+      summary: activate a wallet
+      description: activates a deactivated wallet
       parameters: 
-        - in: path
-          name: filters
-          description: Combination of filters
-          required: true
-          type: array
-          items:
-            type: string
+        - in: body
+          name: activate
+          schema:
+            $ref: '#/definitions/UserWallet'
       responses:
-        '200':
+        200:
           description: OK
           schema:
-            $ref: '#/definitions/Transactions'
+            $ref: '#/definitions/WalletStatusMessage'
+  /deactivate:
+    put:
+      summary: deactivate a wallet
+      description: deactivates an active wallet
+      parameters: 
+        - in: body
+          name: deactivate
+          schema:
+            $ref: '#/definitions/UserWallet'
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/WalletStatusMessage'
+  /update_currencies:
+    put:
+      summary: Updates currencies 
+      description: Update currencies through the currency config file
+      parameters: 
+        - in: body
+          name: update_currencies
+          schema:
+            $ref: '#/definitions/CurrencyForceUpdate'
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/UpdateCurrency'
 definitions:
   #request
   CreateWallet:
     type: object
     required:
-      - userId
+      - user_id
         currency
     properties:
-      userId:
+      user_id:
         type: string
       currency:
         type: string
@@ -149,28 +180,31 @@ definitions:
   WalletId:
     type: object
     properties:
-      walletId:
+      wallet_id:
         type: string
       message:
         type: string
-      requestStatus:
+      request_status:
         type: number
   #request
   UpdateWallet:
     type: object
     required:
-      - walletId
-        amount
+      - user_id
+      - currency
+      - amount
     properties:
-      walletId:
+      user_id:
+        type: string
+      currency:
         type: string
       amount:
         type: number
       source:
         type: string
-      paymentId:
+      payment_id:
         type: string
-      TransctionRemarks:
+      Transaction_remarks:
         type: string
   #resposne
   Balance:
@@ -180,7 +214,7 @@ definitions:
         type: number
       message:
         type: string
-      requestStatus:
+      request_status:
         type: number
   #response
   UserWallets:
@@ -191,15 +225,27 @@ definitions:
         items:
           type: object
           properties:
-            walletId:
+            wallet_id:
               type: string
             balance:
               type: number
-            message:
-              type: string
-            requestStatus:
-              type: number
+      message:
+        type: string
+      request_status:
+        type: number
   #request
+  Filters:
+    type: object
+    properties:
+      user_id:
+        type: string
+      transaction_type:
+        type: string
+      start_date:
+        type: string
+      end_date:
+        type: string
+  #response
   Transactions:
     type: object
     properties:
@@ -208,12 +254,113 @@ definitions:
         items:
           type: object
           properties:
-            transactionId:
+            transaction_id:
               type: string
-            transactionType:
+            payment_id:
               type: string
-            transactionDateTime:
+            source:
               type: string
-            transactionAmount:
+            transaction_date:
+              type: string
+            transaction_time:
+              type: string
+            previous_balance:
               type: number
+            transaction_amount:
+              type: number
+            current_balance:
+              type: number
+            transaction_remarks:
+              type: string
+            wallet_id:
+              type: string
+            transaction_type:
+              type: string
+      message:
+        type: string
+      request_status:
+        type: number
+  #response
+  Currencies:
+    type: object
+    properties:
+      currency_list:
+        type: array
+        items:
+          type: string
+  #request
+  UserWallet:
+    type: object
+    required:
+      - user_id
+        currency
+    properties:
+      user_id:
+        type: string
+      currency:
+        type: string
+  #response
+  WalletStatusMessage:
+    type: object
+    properties:
+      message:
+        type: string
+      request_status:
+        type: number
+  #request
+  CurrencyForceUpdate:
+    type: object
+    properties:
+      limit_hard:
+        type: boolean
+      satatus_hard:
+        type: boolean
+  #response
+  UpdateCurrency:
+    type: object
+    properties:
+      currency_status:
+        type: object
+        properties:
+          user:
+            type: array
+            items:
+              type: object
+              properties:
+                currency_id:
+                  type: number
+                user_id:
+                  type: string
+                current_balance:
+                  type: number
+                active:
+                  type: boolean
+          message:
+            type: string
+          request_status:
+            type: number
+      currency_limit:
+        type: object
+        properties:
+          user:
+            type: array
+            items:
+              type: object
+              properties:
+                currency_id:
+                  type: number
+                user_id:
+                  type: string
+                current_balance:
+                  type: number
+                active:
+                  type: boolean
+          message:
+            type: string
+          request_status:
+            type: number
+      message:
+        type: string
+      request_status:
+        type: number
 ```

@@ -9,4 +9,8 @@ urlpatterns = [
     path('transactions/', transactions, name='user_transactions'),
     path('user/wallets/', user_wallets, name='user_wallets'),
     path('user/balance/', current_balance_in_wallet, name='current_balance_in_wallet'),
+    path('allowed_currencies/', allowed_currencies, name='currencies'),
+    path('activate/', wallet_status, name='activate'),
+    path('deactivate/', wallet_status, name='deactivate'),
+    path('update_currencies/', update_currencies, name='update_currencies'),
 ]
