@@ -25,7 +25,10 @@ SECRET_KEY = '(6fpbvtm0)0l$+6%yjk$#qg493^!w19s83ke8tf4nmot$uxd)4'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['testserver', '127.0.0.1']
+
+NOSE_ARGS = ['--nocapture',
+             '--nologcapture',]
 
 
 # Application definition
