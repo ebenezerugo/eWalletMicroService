@@ -8,7 +8,7 @@ from django.http import JsonResponse
 @require_http_methods(['POST'])
 @csrf_exempt
 def create_wallet(request):
-    data = get_wallet_creation_data(JSONParser().parse(request))
+    data = JSONParser().parse(request)
     context, response_status = handle_create_wallet(data)
     return JsonResponse(context, status=response_status)
 

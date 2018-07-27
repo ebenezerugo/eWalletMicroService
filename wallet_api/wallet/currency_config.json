@@ -1,8 +1,8 @@
 [
   {
     "currency_name": "INR",
-    "limit": 100,
-    "active": 0
+    "limit": 1000,
+    "active": 1
   },
   {
     "currency_name": "USD",
