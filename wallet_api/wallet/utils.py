@@ -23,16 +23,20 @@ def get_wallet_id(*args):
 # ----------------------------------------------------------------------------------------------------------------------
 
 def get_currency_config():
-    with open('wallet/currency_config.json') as config:
-        data = json.load(config)
-    return data
+    try:
+        with open('wallet/currency_config.json') as config:
+            data = json.load(config)
+        return data
+    except Exception as e:
+        logging.info(e)
 
 
 def get_currency_object(currency_name):
     try:
         currency_object = Currency.objects.get(currency_name=currency_name)
-    except:
+    except Exception as e:
         currency_object = None
+        logging.info(e)
     return currency_object
 
 
@@ -86,20 +90,23 @@ def new_currency(currency_item, context, update_success):
 @track_runtime
 @track_database
 def handle_update_currencies(data):
-    currencies = get_currency_config()
-    update_success = get_context(message='Currency has been updated', request_status=1)
-    context = dict()
-    with transaction.atomic():
-        for currency_item in currencies:
-            currency_object = get_currency_object(currency_item['currency_name'])
-            if currency_object:
-                context.update(existing_currency(currency_object, currency_item, data, update_success))
-            else:
-                new_currency_context = new_currency(currency_item, context, update_success)
-                if 'error' in new_currency_context.keys():
-                    return new_currency_context, status.HTTP_400_BAD_REQUEST
-                context.update(new_currency_context)
-        return context, status.HTTP_200_OK
+    serializer = CurrencyConfigSerializer(data=get_currency_config(), many=True)
+    if serializer.is_valid():
+        currencies = serializer.data
+        update_success = get_context(message='Currency has been updated', request_status=1)
+        context = dict()
+        with transaction.atomic():
+            for currency_item in currencies:
+                currency_object = get_currency_object(currency_item['currency_name'])
+                if currency_object:
+                    context.update(existing_currency(currency_object, currency_item, data, update_success))
+                else:
+                    new_currency_context = new_currency(currency_item, context, update_success)
+                    if 'error' in new_currency_context.keys():
+                        return new_currency_context, status.HTTP_400_BAD_REQUEST
+                    context.update(new_currency_context)
+            return context, status.HTTP_200_OK
+    return serializer.errors[0], status.HTTP_400_BAD_REQUEST
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -230,7 +237,8 @@ def get_transactions_by_date(filters, transaction_objects):
         else:
             end_date = start_date
         return transaction_objects.filter(transaction_date__range=(start_date, end_date))
-    except:
+    except Exception as e:
+        logging.info(e)
         return transaction_objects.none()
 
 
@@ -242,7 +250,8 @@ def get_transactions_by_user(user_id, transaction_objects):
             transactions_in_wallet = transactions_in_wallet | (
                 transaction_objects.filter(wallet_id=wallet.wallet_id))
         return transactions_in_wallet
-    except:
+    except Exception as e:
+        logging.info(e)
         return transaction_objects.none()
 
 
@@ -250,7 +259,8 @@ def get_transactions_by_type(transaction_type, transaction_objects):
     try:
         transaction_type = TransactionType.objects.get(type_name=transaction_type).type_id
         return transaction_objects.filter(transaction_type=transaction_type)
-    except:
+    except Exception as e:
+        logging.info(e)
         return transaction_objects.none()
 
 
@@ -314,6 +324,7 @@ def handle_current_balance_in_wallet(data):
         try:
             current_balance = Wallet.objects.get(wallet_id=wallet_id).current_balance
         except Exception as e:
+            logging.info(e)
             return get_context(error=str(e), request_status=0), status.HTTP_400_BAD_REQUEST
         return get_context(current_balance=current_balance, message='Retrieved current balance',
                            request_status=1), status.HTTP_200_OK

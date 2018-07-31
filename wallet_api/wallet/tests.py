@@ -332,6 +332,12 @@ class TransactionsByDateTestCase(TestCase):
         transactions = get_transactions_by_date(filters, transaction_objects)
         self.assertEqual(len(transactions), 0)
 
+    def test_get_transactions_by_date_invalid_date_number(self):
+        filters = {"start_date": "2018/07/24", "end_date": 44}
+        transaction_objects = Transaction.objects
+        transactions = get_transactions_by_date(filters, transaction_objects)
+        self.assertEqual(len(transactions), 0)
+
 
 # @skip('completed')
 class TransactionsByTypeTestCase(TestCase):
@@ -373,6 +379,12 @@ class TransactionsByTypeTestCase(TestCase):
 
     def test_get_transactions_by_type_invalid_transaction_type(self):
         transaction_type = ""
+        transaction_objects = Transaction.objects
+        transactions = get_transactions_by_type(transaction_type, transaction_objects)
+        self.assertEqual(len(transactions), 0)
+
+    def test_get_transactions_by_type_invalid_transaction_type_number(self):
+        transaction_type = 4
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_type(transaction_type, transaction_objects)
         self.assertEqual(len(transactions), 0)

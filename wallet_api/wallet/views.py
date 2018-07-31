@@ -68,4 +68,5 @@ def wallet_status(request):
 def update_currencies(request):
     data = JSONParser().parse(request)
     context, response_status = handle_update_currencies(data)
+    print(context)
     return JsonResponse(context, status=response_status)
