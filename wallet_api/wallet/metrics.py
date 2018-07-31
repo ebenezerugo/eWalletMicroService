@@ -51,8 +51,8 @@ class DBProfiler(object):
     def __exit__(self, *args):
         self.final = len(connection.queries)
         self.count = self.final - self.initial
-        for query in connection.queries:
-            print(query)
+        # for query in connection.queries:
+        #     print(query)
         logging.info('%s | database: %s queries', self.identifier, self.count)
 
 

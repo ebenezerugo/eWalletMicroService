@@ -4,7 +4,7 @@ from django.utils import timezone
 
 class Currency(models.Model):
     currency_id = models.AutoField(primary_key=True)
-    currency_name = models.CharField(max_length=10) #reduce
+    currency_name = models.CharField(max_length=10)
     currency_limit = models.FloatField()
     active = models.BooleanField()
 
@@ -50,3 +50,6 @@ class Transaction(models.Model):
 
     def __str__(self):
         return self.transaction_id
+
+    class Meta:
+        ordering = ('transaction_date',)

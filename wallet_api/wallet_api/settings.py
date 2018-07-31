@@ -27,10 +27,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['testserver', '127.0.0.1']
 
-NOSE_ARGS = ['--nocapture',
-             '--nologcapture',]
-
-
 # Application definition
 
 INSTALLED_APPS = [

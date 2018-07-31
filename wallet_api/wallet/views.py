@@ -26,7 +26,8 @@ def transact(request):
 @csrf_exempt
 def transactions(request):
     filters = JSONParser().parse(request)
-    context, response_status = handle_transactions_details(filters)
+    page = request.GET.get('page')
+    context, response_status = handle_transactions_details(filters, page)
     return JsonResponse(context, status=response_status)
 
 
@@ -41,9 +42,8 @@ def user_wallets(request):
 @require_http_methods(['GET'])
 @csrf_exempt
 def current_balance_in_wallet(request):
-    user_id = request.GET.get('user_id')
-    currency = request.GET.get('currency')
-    context, response_status = handle_current_balance_in_wallet(user_id, currency)
+    data = {'user_id': request.GET.get('user_id'), 'currency': request.GET.get('currency')}
+    context, response_status = handle_current_balance_in_wallet(data)
     return JsonResponse(context, status=response_status)
 
 
@@ -59,7 +59,7 @@ def allowed_currencies(request):
 def wallet_status(request):
     data = JSONParser().parse(request)
     action = str(request.get_full_path().split('/')[-2])
-    context, response_status = handle_wallet_status(data['user_id'], data['currency'], action)
+    context, response_status = handle_wallet_status(data, action)
     return JsonResponse(context, status=response_status)
 
 

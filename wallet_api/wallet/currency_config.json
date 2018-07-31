@@ -7,7 +7,7 @@
   {
     "currency_name": "USD",
     "limit": 100,
-    "active": 1
+    "active": 0
   },
   {
     "currency_name": "EUR",
