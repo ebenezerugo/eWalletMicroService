@@ -1,6 +1,14 @@
 # eWallet Micro Service
 ##### Closed eWallet Service
 
+### Installation
+
+1. Clone the repository:
+``` https://github.com/DotOp3rator011/eWalletMicroService.git ```
+
+2. Install requirements:
+``` pip insatll -r requirements.txt ```
+
 ### Data Flow Diagram
 ![](images/dfd.png?raw=true)
 
