@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Swagger UI</title>
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,700|Source+Code+Pro:300,600|Titillium+Web:400,600,700" rel="stylesheet">
+  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.2.2/swagger-ui.css" >
+  <style>
+    html
+    {
+      box-sizing: border-box;
+      overflow: -moz-scrollbars-vertical;
+      overflow-y: scroll;
+    }
+    *,
+    *:before,
+    *:after
+    {
+      box-sizing: inherit;
+    }
+    body {
+      margin:0;
+      background: #fafafa;
+    }
+  </style>
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.2.2/swagger-ui-bundle.js"> </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.2.2/swagger-ui-standalone-preset.js"> </script>
+<script>
+window.onload = function() {
+  var spec = {"host": "localhost:8080", "info": {"title": "wallet", "version": "0.0.0", "description": "API for wallet micro service"}, "schemes": ["https"], "swagger": "2.0", "definitions": {"WalletId": {"properties": {"wallet_id": {"type": "string"}, "message": {"type": "string"}, "request_status": {"type": "number"}}, "type": "object"}, "CurrencyForceUpdate": {"properties": {"status_hard": {"type": "boolean"}, "limit_hard": {"type": "boolean"}}, "type": "object"}, "Balance": {"properties": {"current_balance": {"type": "number"}, "message": {"type": "string"}, "request_status": {"type": "number"}}, "type": "object"}, "Transactions": {"properties": {"message": {"type": "string"}, "transactions": {"items": {"properties": {"payment_id": {"type": "string"}, "source": {"type": "string"}, "transaction_date": {"type": "string"}, "transaction_time": {"type": "string"}, "transaction_id": {"type": "string"}, "wallet_id": {"type": "string"}, "transaction_type": {"type": "string"}, "transaction_remarks": {"type": "string"}, "previous_balance": {"type": "number"}, "transaction_amount": {"type": "number"}, "current_balance": {"type": "number"}}, "type": "object"}, "type": "array"}, "request_status": {"type": "number"}}, "type": "object"}, "UpdateCurrency": {"properties": {"currency_limit": {"properties": {"message": {"type": "string"}, "user": {"items": {"properties": {"user_id": {"type": "string"}, "active": {"type": "boolean"}, "current_balance": {"type": "number"}, "currency_id": {"type": "number"}}, "type": "object"}, "type": "array"}, "request_status": {"type": "number"}}, "type": "object"}, "currency_status": {"properties": {"message": {"type": "string"}, "user": {"items": {"properties": {"user_id": {"type": "string"}, "active": {"type": "boolean"}, "current_balance": {"type": "number"}, "currency_id": {"type": "number"}}, "type": "object"}, "type": "array"}, "request_status": {"type": "number"}}, "type": "object"}, "message": {"type": "string"}, "request_status": {"type": "number"}}, "type": "object"}, "CreateWallet": {"required": ["user_id currency"], "properties": {"user_id": {"type": "string"}, "currency": {"type": "string"}}, "type": "object"}, "UpdateWallet": {"required": ["user_id", "currency", "amount"], "properties": {"payment_id": {"type": "string"}, "amount": {"type": "number"}, "user_id": {"type": "string"}, "source": {"type": "string"}, "currency": {"type": "string"}, "Transaction_remarks": {"type": "string"}}, "type": "object"}, "UserWallets": {"properties": {"request_status": {"type": "number"}, "wallets": {"items": {"properties": {"balance": {"type": "number"}, "wallet_id": {"type": "string"}}, "type": "object"}, "type": "array"}, "message": {"type": "string"}}, "type": "object"}, "Filters": {"properties": {"user_id": {"type": "string"}, "transaction_type": {"type": "string"}, "end_date": {"type": "string"}, "start_date": {"type": "string"}}, "type": "object"}, "UserWallet": {"required": ["user_id currency"], "properties": {"user_id": {"type": "string"}, "currency": {"type": "string"}}, "type": "object"}, "Currencies": {"properties": {"currency_list": {"items": {"properties": {"currency_name": {"type": "string"}, "limit": {"type": "number"}}, "type": "object"}, "type": "array"}, "request_status": {"type": "number"}}, "type": "object"}, "WalletStatusMessage": {"properties": {"message": {"type": "string"}, "request_status": {"type": "number"}}, "type": "object"}}, "basePath": "/wallet", "paths": {"/credit": {"put": {"summary": "Credit to user wallet", "parameters": [{"name": "credit", "schema": {"$ref": "#/definitions/UpdateWallet"}, "in": "body"}], "description": "Credit the specified amount in the user's wallet", "responses": {"200": {"schema": {"$ref": "#/definitions/Balance"}, "description": "OK"}}}}, "/allowed_currencies": {"get": {"summary": "Returns allowed currencies", "description": "Returns a list of allowed currencies", "responses": {"200": {"schema": {"$ref": "#/definitions/Currencies"}, "description": "OK"}}}}, "/create_wallet": {"post": {"summary": "Create user wallet", "parameters": [{"name": "create_wallet", "schema": {"$ref": "#/definitions/CreateWallet"}, "in": "body"}], "description": "Create a wallet for the user for specified currency and return the wallet Id", "responses": {"201": {"schema": {"$ref": "#/definitions/WalletId"}, "description": "CREATED"}}}}, "/transactions": {"post": {"summary": "Returns transactions", "parameters": [{"name": "filters", "schema": {"$ref": "#/definitions/Filters"}, "description": "filters necessary to filter the transactions", "in": "body"}], "description": "Returns list of all or filtered transactions in detail", "responses": {"200": {"schema": {"$ref": "#/definitions/Transactions"}, "description": "OK"}}}}, "/debit": {"put": {"summary": "Debit from user wallet", "parameters": [{"name": "debit", "schema": {"$ref": "#/definitions/UpdateWallet"}, "in": "body"}], "description": "Debit the specified amount from thr user's wallet", "responses": {"200": {"schema": {"$ref": "#/definitions/Balance"}, "description": "OK"}}}}, "/update_currencies": {"put": {"summary": "Updates currencies", "parameters": [{"name": "update_currencies", "schema": {"$ref": "#/definitions/CurrencyForceUpdate"}, "in": "body"}], "description": "Update currencies through the currency config file", "responses": {"200": {"schema": {"$ref": "#/definitions/UpdateCurrency"}, "description": "OK"}}}}, "/user/wallets": {"get": {"summary": "Returns current user's wallets", "parameters": [{"name": "user_id", "required": true, "description": "The Id of the current user", "in": "query", "type": "string"}], "description": "Returns the list  of wallets owned by the current user", "responses": {"200": {"schema": {"$ref": "#/definitions/UserWallets"}, "description": "OK"}}}}, "/deactivate": {"put": {"summary": "deactivate a wallet", "parameters": [{"name": "deactivate", "schema": {"$ref": "#/definitions/UserWallet"}, "in": "body"}], "description": "deactivates an active wallet", "responses": {"200": {"schema": {"$ref": "#/definitions/WalletStatusMessage"}, "description": "OK"}}}}, "/activate": {"put": {"summary": "activate a wallet", "parameters": [{"name": "activate", "schema": {"$ref": "#/definitions/UserWallet"}, "in": "body"}], "description": "activates a deactivated wallet", "responses": {"200": {"schema": {"$ref": "#/definitions/WalletStatusMessage"}, "description": "OK"}}}}, "/user/balance": {"get": {"summary": "Retruns balance amount is user's wallet", "parameters": [{"name": "user_id", "required": true, "description": "The Id of the current user's desired wallet", "in": "query", "type": "string"}, {"name": "currenncy", "required": true, "description": "The currency of the wallet", "in": "query", "type": "string"}], "description": "Returns the balance amount in the current user's specified wallet", "responses": {"200": {"schema": {"$ref": "#/definitions/Balance"}, "description": "OK"}}}}}};
+  // Build a system
+  const ui = SwaggerUIBundle({
+    spec: spec,
+    dom_id: '#swagger-ui',
+    deepLinking: true,
+    presets: [
+      SwaggerUIBundle.presets.apis,
+      SwaggerUIStandalonePreset
+    ],
+    plugins: [
+      SwaggerUIBundle.plugins.DownloadUrl
+    ],
+    layout: "StandaloneLayout"
+  })
+  window.ui = ui
+}
+</script>
+</body>
+</html>

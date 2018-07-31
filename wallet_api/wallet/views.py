@@ -3,6 +3,7 @@ from django.views.decorators.http import require_http_methods
 from rest_framework.parsers import JSONParser
 from .utils import *
 from django.http import JsonResponse
+from django.shortcuts import render
 
 
 @require_http_methods(['POST'])
@@ -70,3 +71,8 @@ def update_currencies(request):
     context, response_status = handle_update_currencies(data)
     print(context)
     return JsonResponse(context, status=response_status)
+
+
+def api_doc(request):
+    return render(request, 'wallet/doc.html')
+

@@ -13,4 +13,5 @@ urlpatterns = [
     path('activate/', wallet_status, name='activate'),
     path('deactivate/', wallet_status, name='deactivate'),
     path('update_currencies/', update_currencies, name='update_currencies'),
+    path('docs/', api_doc, name='api_doc'),
 ]

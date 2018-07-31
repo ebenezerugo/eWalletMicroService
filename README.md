@@ -15,8 +15,13 @@
 ### Schema Design
 ![](images/schemadesign.png?raw=true)
 
-### API documention snippet from Swagger
-``` javascript
+### API documention
+
+##### The documentaion can be viewed using the following endpoint
+``` /wallet/docs/ ```
+
+#### Documnetation snippet from swagger
+```yaml
 swagger: '2.0'
 info:
   version: 0.0.0
@@ -27,6 +32,29 @@ basePath: /wallet
 schemes:
   - https
 paths:
+  /update_currencies:
+    put:
+      summary: Updates currencies
+      description: Update currencies through the currency config file
+      parameters:
+        - in: body
+          name: update_currencies
+          schema:
+            $ref: '#/definitions/CurrencyForceUpdate'
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/UpdateCurrency'
+  /allowed_currencies:
+    get:
+      summary: Returns allowed currencies
+      description: Returns a list of allowed currencies
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/Currencies'
   /create_wallet:
     post:
       summary: Create user wallet
@@ -75,33 +103,33 @@ paths:
     post:
       summary: Returns transactions
       description: Returns list of all or filtered transactions in detail
-      parameters: 
+      parameters:
         - in: body
           name: filters
           description: filters necessary to filter the transactions
           schema:
             $ref: '#/definitions/Filters'
       responses:
-        200:
+        '200':
           description: OK
           schema:
             $ref: '#/definitions/Transactions'
-  '/user/wallets':
+  /user/wallets:
     get:
       summary: Returns current user's wallets
       description: Returns the list  of wallets owned by the current user
       parameters:
-      - in : query
-        name: user_id
-        description: The Id of the current user
-        type: string
-        required: true
+        - in: query
+          name: user_id
+          description: The Id of the current user
+          type: string
+          required: true
       responses:
         '200':
           description: OK
           schema:
             $ref: '#/definitions/UserWallets'
-  '/user/balance':
+  /user/balance:
     get:
       summary: Retruns balance amount is user's wallet
       description: Returns the balance amount in the current user's specified wallet
@@ -121,26 +149,17 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Balance'
-  /allowed_currencies:
-    get:
-      summary: Returns allowed currencies
-      description: Returns a list of allowed currencies
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/Currencies'
   /activate:
     put:
       summary: activate a wallet
       description: activates a deactivated wallet
-      parameters: 
+      parameters:
         - in: body
           name: activate
           schema:
             $ref: '#/definitions/UserWallet'
       responses:
-        200:
+        '200':
           description: OK
           schema:
             $ref: '#/definitions/WalletStatusMessage'
@@ -148,43 +167,26 @@ paths:
     put:
       summary: deactivate a wallet
       description: deactivates an active wallet
-      parameters: 
+      parameters:
         - in: body
           name: deactivate
           schema:
             $ref: '#/definitions/UserWallet'
       responses:
-        200:
+        '200':
           description: OK
           schema:
             $ref: '#/definitions/WalletStatusMessage'
-  /update_currencies:
-    put:
-      summary: Updates currencies 
-      description: Update currencies through the currency config file
-      parameters: 
-        - in: body
-          name: update_currencies
-          schema:
-            $ref: '#/definitions/CurrencyForceUpdate'
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/UpdateCurrency'
 definitions:
-  #request
   CreateWallet:
     type: object
     required:
-      - user_id
-        currency
+      - user_id currency
     properties:
       user_id:
         type: string
       currency:
         type: string
-  #response
   WalletId:
     type: object
     properties:
@@ -194,7 +196,6 @@ definitions:
         type: string
       request_status:
         type: number
-  #request
   UpdateWallet:
     type: object
     required:
@@ -214,17 +215,15 @@ definitions:
         type: string
       Transaction_remarks:
         type: string
-  #resposne
   Balance:
     type: object
     properties:
-      balance:
+      current_balance:
         type: number
       message:
         type: string
       request_status:
         type: number
-  #response
   UserWallets:
     type: object
     properties:
@@ -241,7 +240,6 @@ definitions:
         type: string
       request_status:
         type: number
-  #request
   Filters:
     type: object
     properties:
@@ -253,7 +251,6 @@ definitions:
         type: string
       end_date:
         type: string
-  #response
   Transactions:
     type: object
     properties:
@@ -288,26 +285,29 @@ definitions:
         type: string
       request_status:
         type: number
-  #response
   Currencies:
     type: object
     properties:
       currency_list:
         type: array
         items:
-          type: string
-  #request
+          type: object
+          properties:
+            currency_name:
+              type: string
+            limit:
+              type: number
+      request_status:
+        type: number
   UserWallet:
     type: object
     required:
-      - user_id
-        currency
+      - user_id currency
     properties:
       user_id:
         type: string
       currency:
         type: string
-  #response
   WalletStatusMessage:
     type: object
     properties:
@@ -315,15 +315,13 @@ definitions:
         type: string
       request_status:
         type: number
-  #request
   CurrencyForceUpdate:
     type: object
     properties:
       limit_hard:
         type: boolean
-      satatus_hard:
+      status_hard:
         type: boolean
-  #response
   UpdateCurrency:
     type: object
     properties:
