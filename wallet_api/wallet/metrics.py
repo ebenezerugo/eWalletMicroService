@@ -4,7 +4,7 @@ from datetime import datetime, time
 from django.db import connection
 from pprint import pprint
 
-logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('django.server')
 
 
 def delta_to_datetime(_d):
@@ -25,8 +25,8 @@ class Timer(object):
         self.interval = self.end - self.start
         _time = delta_to_datetime(self.interval)
         self.time = _time
-        logging.info('%s | runtime: %s m, %s s, %s ms', self.identifier, _time.minute, _time.second,
-                     _time.microsecond // 1000)
+        logger.info('%s | runtime: %s m, %s s, %s ms', self.identifier, _time.minute, _time.second,
+                    _time.microsecond // 1000)
 
 
 def track_runtime(func):
@@ -53,7 +53,7 @@ class DBProfiler(object):
         self.count = self.final - self.initial
         # for query in connection.queries:
         #     print(query)
-        logging.info('%s | database: %s queries', self.identifier, self.count)
+        logger.info('%s | database: %s queries', self.identifier, self.count)
 
 
 def track_database(func):

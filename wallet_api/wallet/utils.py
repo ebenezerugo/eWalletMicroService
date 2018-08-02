@@ -7,6 +7,9 @@ from django.db import transaction
 from rest_framework import status
 from dateutil import parser
 from django.core.paginator import Paginator
+import logging
+
+logger = logging.getLogger('django.request')
 
 
 def get_context(**kwargs):
@@ -28,7 +31,7 @@ def get_currency_config():
             data = json.load(config)
         return data
     except Exception as e:
-        logging.info(e)
+        logger.error(e)
 
 
 def get_currency_object(currency_name):
@@ -36,7 +39,7 @@ def get_currency_object(currency_name):
         currency_object = Currency.objects.get(currency_name=currency_name)
     except Exception as e:
         currency_object = None
-        logging.info(e)
+        logger.info(e)
     return currency_object
 
 
@@ -84,11 +87,10 @@ def new_currency(currency_item, context, update_success):
         serializer.save()
         context[currency_item['currency_name']] = update_success
         return context
+    logger.error(serializer.errors)
     return get_context(error=serializer.errors, currency=currency_item['currency_name'], request_status=0)
 
 
-@track_runtime
-@track_database
 def handle_update_currencies(data):
     serializer = CurrencyConfigSerializer(data=get_currency_config(), many=True)
     if serializer.is_valid():
@@ -106,13 +108,13 @@ def handle_update_currencies(data):
                         return new_currency_context, status.HTTP_400_BAD_REQUEST
                     context.update(new_currency_context)
             return context, status.HTTP_200_OK
-    return serializer.errors[0], status.HTTP_400_BAD_REQUEST
+    logger.error(serializer.errors)
+    return serializer.errors, status.HTTP_400_BAD_REQUEST
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@track_runtime
-@track_database
+
 def handle_allowed_currencies():
     currencies = CurrencySerializer(Currency.objects.filter(active=True).values('currency_name', 'currency_limit'),
                                     many=True).data
@@ -133,23 +135,22 @@ def get_wallet_creation_data(data):
         data['currency_id'] = currency.currency_id
         data['wallet_id'] = get_wallet_id(data['user_id'], data['currency'])
         return data
+    logger.error(serializer.errors)
     return get_context(error=serializer.errors)
 
 
-@track_runtime
-@track_database
 def handle_create_wallet(data):
     data = get_wallet_creation_data(data)
     if 'error' in data.keys():
         context = get_context(message=data['error'], request_status=0)
-        # logging.info(data['error'])
+        logger.error(data['error'])
         return context, status.HTTP_400_BAD_REQUEST
     serializer = WalletSerializer(data=data)
     if serializer.is_valid():
         serializer.save()
         context = get_context(wallet_id=serializer.data['wallet_id'], message='wallet created', request_status=1)
         return context, status.HTTP_201_CREATED
-    # logging.info(serializer.errors)
+    logger.info(serializer.errors)
     return serializer.errors, status.HTTP_400_BAD_REQUEST
 
 
@@ -162,24 +163,22 @@ def get_new_balance(balance, amount, transaction_type):
         return balance - float(amount)
 
 
-def get_transaction_data(data, transaction_type):
+def get_transaction_data(data, transaction_type, wallet):
+    transaction_types = {'CREDIT': 1, 'DEBIT': 2}
     serializer = TransactionDataSerializer(data=data)
     if serializer.is_valid():
-        wallet_id = get_wallet_id(data['user_id'], data['currency'])
-        try:
-            wallet = Wallet.objects.get(pk=wallet_id)
-        except Exception as e:
-            return get_context(error=str(e))
         if not wallet.active:
             return get_context(error='Inactive wallet')
         data['wallet_id'] = wallet.wallet_id
-        data['transaction_id'] = get_wallet_id(data['wallet_id'], str(
-            data['transaction_amount']), )  # str(datetime.now())
         data['previous_balance'] = wallet.current_balance
-        data['transaction_type'] = TransactionType.objects.get(type_name=transaction_type).type_id
+        if transaction_type in transaction_types.keys():
+            data['transaction_type'] = transaction_types[transaction_type]
+        else:
+            return get_context(error='Invalid transaction type')
         data['current_balance'] = get_new_balance(data['previous_balance'], data['transaction_amount'],
                                                   transaction_type)
         return data
+    logger.error(serializer.errors)
     return get_context(error=serializer.errors)
 
 
@@ -191,37 +190,46 @@ def check_limit(balance, currency):
         return False
 
 
-def make_transaction(data, transaction_type):
+def make_transaction(data, transaction_type, wallet):
     serializer = TransactionSerializer(data=data)
     if serializer.is_valid():
         with transaction.atomic():
-            Wallet.objects.filter(wallet_id=data['wallet_id']).update(current_balance=data['current_balance'])
+            wallet.current_balance = data['current_balance']
+            wallet.save()
             serializer.save()
-        context = get_context(current_balance=data['current_balance'], message=transaction_type + ' Successful',
-                              request_status=1)
+        context = get_context(message=transaction_type + ' Successful', request_status=1,
+                              transaction_details=serializer.data)
         return context, status.HTTP_200_OK
+    logger.error(serializer.errors)
     return serializer.errors, status.HTTP_400_BAD_REQUEST
 
 
-@track_runtime
-@track_database
 def handle_transact(data, transaction_type):
-    data = get_transaction_data(data, transaction_type)
-    if 'error' in data.keys():
-        context = get_context(message=data['error'], request_status=0)
-        return context, status.HTTP_400_BAD_REQUEST
-    context = get_context(current_balance=data['previous_balance'], message='', request_status=0)
-    if transaction_type == 'CREDIT':
-        if check_limit(data['current_balance'], data['currency']):
-            context['message'] = 'Credit failed due to currency limit'
-            context['currency_limit'] = Currency.objects.get(currency_name=data['currency']).currency_limit
-            return context, status.HTTP_200_OK
-    elif transaction_type == 'DEBIT':
-        if data['current_balance'] < 0:
-            context['message'] = 'Debit failed due to insufficient funds'
-            return context, status.HTTP_200_OK
-    context, response_status = make_transaction(data, transaction_type)
-    return context, response_status
+    serializer = UserAndCurrencySerializer(data=data)
+    if serializer.is_valid():
+        wallet_id = get_wallet_id(data['user_id'], data['currency'])
+        try:
+            wallet = Wallet.objects.get(wallet_id=wallet_id)
+        except Exception as e:
+            logger.error(e)
+            return get_context(error=str(e)), status.HTTP_400_BAD_REQUEST
+        data = get_transaction_data(data, transaction_type, wallet)
+        if 'error' in data.keys():
+            context = get_context(message=data['error'], request_status=0)
+            return context, status.HTTP_400_BAD_REQUEST
+        context = get_context(current_balance=data['previous_balance'], message='', request_status=0)
+        if transaction_type == 'CREDIT':
+            if check_limit(data['current_balance'], data['currency']):
+                context['message'] = 'Credit failed due to currency limit'
+                context['currency_limit'] = Currency.objects.get(currency_name=data['currency']).currency_limit
+                return context, status.HTTP_200_OK
+        elif transaction_type == 'DEBIT':
+            if data['current_balance'] < 0:
+                context['message'] = 'Debit failed due to insufficient funds'
+                return context, status.HTTP_200_OK
+        context, response_status = make_transaction(data, transaction_type, wallet)
+        return context, response_status
+    return get_context(error=serializer.errors), status.HTTP_400_BAD_REQUEST
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -238,7 +246,7 @@ def get_transactions_by_date(filters, transaction_objects):
             end_date = start_date
         return transaction_objects.filter(transaction_date__range=(start_date, end_date))
     except Exception as e:
-        logging.info(e)
+        logger.error(e)
         return transaction_objects.none()
 
 
@@ -251,16 +259,16 @@ def get_transactions_by_user(user_id, transaction_objects):
                 transaction_objects.filter(wallet_id=wallet.wallet_id))
         return transactions_in_wallet
     except Exception as e:
-        logging.info(e)
+        logger.error(e)
         return transaction_objects.none()
 
 
 def get_transactions_by_type(transaction_type, transaction_objects):
     try:
-        transaction_type = TransactionType.objects.get(type_name=transaction_type).type_id
+        # transaction_type = TransactionType.objects.get(type_name=transaction_type).type_id
         return transaction_objects.filter(transaction_type=transaction_type)
     except Exception as e:
-        logging.info(e)
+        logger.error(e)
         return transaction_objects.none()
 
 
@@ -285,23 +293,22 @@ def get_transactions(filters, page):
     return transactions
 
 
-@track_runtime
-@track_database
 def handle_transactions_details(filters, page):
-    curated_transactions = get_transactions(filters, page)
-    if not len(curated_transactions):
-        return get_context(message='Found ' + str(len(curated_transactions)) + ' transactions',
-                           request_status=0), status.HTTP_200_OK
-    else:
-        return get_context(transactions=curated_transactions,
-                           message='Found ' + str(len(curated_transactions)) + ' transactions',
-                           request_status=1), status.HTTP_200_OK
+    if PageSerializer(data={'page': page}).is_valid():
+        curated_transactions = get_transactions(filters, page)
+        if not len(curated_transactions):
+            return get_context(message='Found ' + str(len(curated_transactions)) + ' transactions',
+                               request_status=0), status.HTTP_200_OK
+        else:
+            return get_context(transactions=curated_transactions,
+                               message='Found ' + str(len(curated_transactions)) + ' transactions',
+                               request_status=1), status.HTTP_200_OK
+    return get_context(message='Invalid page number', request_status=0), status.HTTP_400_BAD_REQUEST
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@track_runtime
-@track_database
+
 def handle_user_wallets(user_id):
     serializer = UserAndCurrencySerializer(data={'user_id': user_id, 'currency': 'All'})
     if serializer.is_valid():
@@ -310,13 +317,13 @@ def handle_user_wallets(user_id):
         serializer = WalletDetailSerializer(wallets, many=True)
         return get_context(wallets=serializer.data, message='Found ' + str(len(wallets)) + ' wallets',
                            request_status=1), status.HTTP_200_OK
+    logger.error(serializer.errors)
     return get_context(error=serializer.errors, request_status=0), status.HTTP_400_BAD_REQUEST
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@track_runtime
-@track_database
+
 def handle_current_balance_in_wallet(data):
     serializer = UserAndCurrencySerializer(data=data)
     if serializer.is_valid():
@@ -324,18 +331,17 @@ def handle_current_balance_in_wallet(data):
         try:
             current_balance = Wallet.objects.get(wallet_id=wallet_id).current_balance
         except Exception as e:
-            logging.info(e)
+            logger.error(e)
             return get_context(error=str(e), request_status=0), status.HTTP_400_BAD_REQUEST
         return get_context(current_balance=current_balance, message='Retrieved current balance',
                            request_status=1), status.HTTP_200_OK
+    logger.error(serializer.errors)
     return get_context(error=serializer.errors, request_status=0), status.HTTP_400_BAD_REQUEST
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@track_runtime
-@track_database
 def handle_wallet_status(data, action):
     serializer = UserAndCurrencySerializer(data=data)
     if serializer.is_valid():
@@ -351,6 +357,7 @@ def handle_wallet_status(data, action):
             return get_context(message='wallet has been deactivated', request_status=1), status.HTTP_200_OK
         else:
             return get_context(message='action failed', request_status=0), status.HTTP_400_BAD_REQUEST
+    logger.error(serializer.errors)
     return get_context(error=serializer.errors, request_status=0), status.HTTP_400_BAD_REQUEST
 
 # ----------------------------------------------------------------------------------------------------------------------

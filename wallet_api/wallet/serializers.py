@@ -55,3 +55,7 @@ class CurrencyConfigSerializer(serializers.Serializer):
     currency_name = serializers.CharField(min_length=3, max_length=10)
     limit = serializers.FloatField()
     active = serializers.BooleanField()
+
+
+class PageSerializer(serializers.Serializer):
+    page = serializers.IntegerField()

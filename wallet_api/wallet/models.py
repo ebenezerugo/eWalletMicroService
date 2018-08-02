@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.core.validators import MinValueValidator
 
 
 class Currency(models.Model):
@@ -16,7 +17,7 @@ class Wallet(models.Model):
     currency_id = models.ForeignKey(Currency, on_delete=models.CASCADE)
     user_id = models.CharField(max_length=24)
     wallet_id = models.CharField(max_length=32, primary_key=True)
-    wallet_created_date_and_time = models.DateTimeField(default=timezone.now, blank=False)
+    wallet_created_date_and_time = models.DateTimeField(default=timezone.now)
     current_balance = models.FloatField(default=0.0)
     active = models.BooleanField(default=True)
 
@@ -27,29 +28,21 @@ class Wallet(models.Model):
         ordering = ('wallet_created_date_and_time',)
 
 
-class TransactionType(models.Model):
-    type_id = models.AutoField(primary_key=True)
-    type_name = models.CharField(max_length=100)
-
-    def __str__(self):
-        return self.type_name
-
-
 class Transaction(models.Model):
-    transaction_id = models.CharField(max_length=32, primary_key=True)
+    transaction_id = models.AutoField(primary_key=True)
     wallet_id = models.ForeignKey(Wallet, on_delete=models.CASCADE)
     payment_id = models.CharField(max_length=32, blank=True)
     source = models.CharField(max_length=100, blank=True)
-    transaction_type = models.ForeignKey(TransactionType, on_delete=models.CASCADE)
-    transaction_date = models.DateField(default=timezone.now().date)
-    transaction_time = models.TimeField(default=timezone.now().time)
+    transaction_type = models.IntegerField()
+    transaction_date = models.DateField(auto_now_add=True)
+    transaction_time = models.TimeField(auto_now_add=True)
     previous_balance = models.FloatField()
-    transaction_amount = models.FloatField()
+    transaction_amount = models.FloatField(validators=[MinValueValidator(1)])
     current_balance = models.FloatField()
     transaction_remarks = models.TextField(blank=True)
 
     def __str__(self):
-        return self.transaction_id
+        return str(self.transaction_id)
 
     class Meta:
         ordering = ('transaction_date',)

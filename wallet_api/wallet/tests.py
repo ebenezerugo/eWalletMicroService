@@ -77,8 +77,6 @@ class TransactionCreationDataTestCase(TestCase):
         data = {'user_id': '54759eb3c090d83409l2l889', 'currency': 'INR'}
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
-        TransactionType.objects.create(type_name='CREDIT')
-        TransactionType.objects.create(type_name='DEBIT')
 
     def test_get_transaction_data_credit_positive(self):
         data = {
@@ -89,11 +87,11 @@ class TransactionCreationDataTestCase(TestCase):
             "payment_id": "1234",
             "transaction_remarks": "deducting money"
         }
-        transaction_type = 'credit'
+        transaction_type = 'CREDIT'
         wallet_id = get_wallet_id(data['user_id'], data['currency'])
-        expected_output = get_wallet_id(wallet_id, str(data['transaction_amount']))
-        actual_output = get_transaction_data(data, transaction_type)['transaction_id']
-        self.assertEqual(actual_output, expected_output)
+        wallet = Wallet.objects.get(wallet_id=wallet_id)
+        actual_output = get_transaction_data(data, transaction_type, wallet)['current_balance']
+        self.assertEqual(actual_output, data['transaction_amount'])
 
     def test_get_transaction_data_debit_positive(self):
         data = {
@@ -104,11 +102,11 @@ class TransactionCreationDataTestCase(TestCase):
             "payment_id": "1234",
             "transaction_remarks": "deducting money"
         }
-        transaction_type = 'credit'
+        transaction_type = 'DEBIT'
         wallet_id = get_wallet_id(data['user_id'], data['currency'])
-        expected_output = get_wallet_id(wallet_id, str(data['transaction_amount']))
-        actual_output = get_transaction_data(data, transaction_type)['transaction_id']
-        self.assertEqual(actual_output, expected_output)
+        wallet = Wallet.objects.get(wallet_id=wallet_id)
+        actual_output = get_transaction_data(data, transaction_type, wallet)['current_balance']
+        self.assertEqual(actual_output, -300)
 
     def test_get_transaction_data_invalid_amount(self):
         data = {
@@ -119,34 +117,9 @@ class TransactionCreationDataTestCase(TestCase):
             "payment_id": "1234",
             "transaction_remarks": "deducting money"
         }
-        transaction_type = 'credit'
-        actual_output = 'error' in get_transaction_data(data, transaction_type)
-        self.assertEqual(actual_output, True)
-
-    def test_get_transaction_data_invalid_user_id(self):
-        data = {
-            "user_id": 134,
-            "currency": "INR",
-            "transaction_amount": 300,
-            "source": "Android",
-            "payment_id": "1234",
-            "transaction_remarks": "deducting money"
-        }
-        transaction_type = 'credit'
-        actual_output = 'error' in get_transaction_data(data, transaction_type)
-        self.assertEqual(actual_output, True)
-
-    def test_get_transaction_data_invalid_currency(self):
-        data = {
-            "user_id": '54759eb3c090d83409l2l889',
-            "currency": "",
-            "transaction_amount": 300,
-            "source": "Android",
-            "payment_id": "1234",
-            "transaction_remarks": "deducting money"
-        }
-        transaction_type = 'credit'
-        actual_output = 'error' in get_transaction_data(data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=get_wallet_id(data['user_id'], data['currency']))
+        transaction_type = 'CREDIT'
+        actual_output = 'error' in get_transaction_data(data, transaction_type, wallet)
         self.assertEqual(actual_output, True)
 
 
@@ -157,15 +130,14 @@ class MakeTransactionTestCase(TestCase):
         data = {'user_id': '54759eb3c090d83409l2l889', 'currency': 'INR'}
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
-        TransactionType.objects.create(type_name='CREDIT')
-        TransactionType.objects.create(type_name='DEBIT')
 
     def test_make_transaction_positive_credit(self):
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 81,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
-        context, response_status = make_transaction(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=get_wallet_id(data['user_id'], data['currency']))
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
+        context, response_status = make_transaction(transaction_data, transaction_type, wallet)
         self.assertEqual(context['request_status'], 1)
         self.assertEqual(response_status, 200)
 
@@ -173,49 +145,37 @@ class MakeTransactionTestCase(TestCase):
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 40,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "deducting money"}
         transaction_type = 'DEBIT'
-        transaction_data = get_transaction_data(data, transaction_type)
-        context, response_status = make_transaction(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=get_wallet_id(data['user_id'], data['currency']))
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
+        context, response_status = make_transaction(transaction_data, transaction_type, wallet)
         self.assertEqual(context['request_status'], 1)
         self.assertEqual(response_status, 200)
 
     def test_make_transaction_positive_null_source_payment_Id_remarks(self):
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 82}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
-        context, response_status = make_transaction(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=get_wallet_id(data['user_id'], data['currency']))
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
+        context, response_status = make_transaction(transaction_data, transaction_type, wallet)
         self.assertEqual(context['request_status'], 1)
         self.assertEqual(response_status, 200)
-
-    def test_make_transaction_invalid_user_id(self):
-        data = {"user_id": "", "currency": "INR", "transaction_amount": 83,
-                "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
-        transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
-        context, response_status = make_transaction(transaction_data, transaction_type)
-        self.assertEqual(response_status, 400)
 
     def test_make_transaction_invalid_amount(self):
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 'hello',
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
-        context, response_status = make_transaction(transaction_data, transaction_type)
-        self.assertEqual(response_status, 400)
-
-    def test_make_transaction_invalid_currency(self):
-        data = {"user_id": "54759eb3c090d83409l2l889", "currency": "", "transaction_amount": 85,
-                "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
-        transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
-        context, response_status = make_transaction(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=get_wallet_id(data['user_id'], data['currency']))
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
+        context, response_status = make_transaction(transaction_data, transaction_type, wallet)
         self.assertEqual(response_status, 400)
 
     def test_make_transaction_invalid_transaction_type(self):
-        data = {"user_id": "54759eb3c090d83409l2l889", "currency": "", "transaction_amount": 85,
+        data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 85,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = ''
-        transaction_data = get_transaction_data(data, transaction_type)
-        context, response_status = make_transaction(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=get_wallet_id(data['user_id'], data['currency']))
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
+        context, response_status = make_transaction(transaction_data, transaction_type, wallet)
         self.assertEqual(response_status, 400)
 
 
@@ -227,14 +187,13 @@ class HandleTransactTestCase(TestCase):
         data = {'user_id': '54759eb3c090d83409l2l889', 'currency': 'INR'}
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
-        TransactionType.objects.create(type_name='CREDIT')
-        TransactionType.objects.create(type_name='DEBIT')
 
     def test_handle_transact_positive(self):
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 95,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=get_wallet_id(data['user_id'], data['currency']))
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         context, response_status = handle_transact(transaction_data, transaction_type)
         self.assertEqual(context['request_status'], 1)
         self.assertEqual(response_status, 200)
@@ -243,7 +202,8 @@ class HandleTransactTestCase(TestCase):
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 1095,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=get_wallet_id(data['user_id'], data['currency']))
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         context, response_status = handle_transact(transaction_data, transaction_type)
         self.assertEqual(context['request_status'], 0)
         self.assertEqual(response_status, 200)
@@ -252,7 +212,8 @@ class HandleTransactTestCase(TestCase):
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 395,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'DEBIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=get_wallet_id(data['user_id'], data['currency']))
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         context, response_status = handle_transact(transaction_data, transaction_type)
         self.assertEqual(context['request_status'], 0)
         self.assertEqual(response_status, 200)
@@ -266,56 +227,57 @@ class TransactionsByDateTestCase(TestCase):
         data = {'user_id': '54759eb3c090d83409l2l889', 'currency': 'INR'}
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
-        TransactionType.objects.create(type_name='CREDIT')
-        TransactionType.objects.create(type_name='DEBIT')
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 195,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 295,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 95,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'DEBIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
 
     def test_get_transactions_by_date_positive(self):
-        filters = {"start_date": "2018-07-31"}
+        filters = {"start_date": "2018-08-1"}
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_date(filters, transaction_objects)
         self.assertEqual(len(transactions), 3)
 
     def test_get_transactions_by_date_positive_date_format(self):
-        filters = {"start_date": "2018/07/31"}
+        filters = {"start_date": "2018/08/1"}
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_date(filters, transaction_objects)
         self.assertEqual(len(transactions), 3)
 
     def test_get_transactions_by_date_positive_start_and_end_date(self):
-        filters = {"start_date": "2018-07-31", "end_date": "2018-07-31"}
+        filters = {"start_date": "2018-08-1", "end_date": "2018-08-1"}
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_date(filters, transaction_objects)
         self.assertEqual(len(transactions), 3)
 
     def test_get_transactions_by_date_positive_start_and_end_date_backdated(self):
-        filters = {"start_date": "2018-07-31", "end_date": "2018-07-20"}
+        filters = {"start_date": "2018-08-1", "end_date": "2018-07-20"}
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_date(filters, transaction_objects)
         self.assertEqual(len(transactions), 0)
 
     def test_get_transactions_by_date_positive_start_and_end_date_format(self):
-        filters = {"start_date": "2018/07/31", "end_date": "2018-jul-31"}
+        filters = {"start_date": "2018/08/1", "end_date": "2018-aug-1"}
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_date(filters, transaction_objects)
         self.assertEqual(len(transactions), 3)
 
     def test_get_transactions_by_date_only_end_date(self):
-        filters = {"end_date": "2018-jul-31"}
+        filters = {"end_date": "2018-aug-1"}
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_date(filters, transaction_objects)
         self.assertEqual(len(transactions), 0)
@@ -327,13 +289,13 @@ class TransactionsByDateTestCase(TestCase):
         self.assertEqual(len(transactions), 0)
 
     def test_get_transactions_by_date_invalid_end_date(self):
-        filters = {"start_date": "2018/07/24", "end_date": "hello"}
+        filters = {"start_date": "2018/08/1", "end_date": "hello"}
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_date(filters, transaction_objects)
         self.assertEqual(len(transactions), 0)
 
     def test_get_transactions_by_date_invalid_date_number(self):
-        filters = {"start_date": "2018/07/24", "end_date": 44}
+        filters = {"start_date": "2018/08/1", "end_date": 44}
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_date(filters, transaction_objects)
         self.assertEqual(len(transactions), 0)
@@ -347,32 +309,33 @@ class TransactionsByTypeTestCase(TestCase):
         data = {'user_id': '54759eb3c090d83409l2l889', 'currency': 'INR'}
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
-        TransactionType.objects.create(type_name='CREDIT')
-        TransactionType.objects.create(type_name='DEBIT')
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 195,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 295,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 95,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'DEBIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
 
     def test_get_transactions_by_type_positive_credit(self):
-        transaction_type = "CREDIT"
+        transaction_type = 1
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_type(transaction_type, transaction_objects)
         self.assertEqual(len(transactions), 2)
 
     def test_get_transactions_by_type_positive_debit(self):
-        transaction_type = "DEBIT"
+        transaction_type = 2
         transaction_objects = Transaction.objects
         transactions = get_transactions_by_type(transaction_type, transaction_objects)
         self.assertEqual(len(transactions), 1)
@@ -398,22 +361,23 @@ class TransactionsByUserTestCase(TestCase):
         data = {'user_id': '54759eb3c090d83409l2l889', 'currency': 'INR'}
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
-        TransactionType.objects.create(type_name='CREDIT')
-        TransactionType.objects.create(type_name='DEBIT')
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 195,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 295,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 95,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'DEBIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
 
     def test_get_transactions_by_user_positive(self):
@@ -443,43 +407,44 @@ class GetTransactionsTestCase(TestCase):
         data = {'user_id': '54759eb3c090d83409l2l889', 'currency': 'INR'}
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
-        TransactionType.objects.create(type_name='CREDIT')
-        TransactionType.objects.create(type_name='DEBIT')
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 195,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 295,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 95,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'DEBIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
 
     def test_get_transactions_start_date(self):
         filters = {
-            'start_date': '2018-07-31',
+            'start_date': '2018-08-1',
         }
         transactions = get_transactions(filters, 1)
         self.assertEqual(len(transactions), 3)
 
     def test_get_transactions_start_and_end_date(self):
         filters = {
-            'start_date': '2018-07-31',
-            'end_date': '2018-07-31',
+            'start_date': '2018-08-1',
+            'end_date': '2018-08-1',
         }
         transactions = get_transactions(filters, 1)
         self.assertEqual(len(transactions), 3)
 
     def test_get_transactions_start_date_end_date_and_user_id(self):
         filters = {
-            'start_date': '2018-07-31',
-            'end_date': '2018-07-31',
+            'start_date': '2018-08-1',
+            'end_date': '2018-08-1',
             'user_id': '54759eb3c090d83409l2l889'
         }
         transactions = get_transactions(filters, 1)
@@ -487,18 +452,18 @@ class GetTransactionsTestCase(TestCase):
 
     def test_get_transactions_start_date_end_date_and_type(self):
         filters = {
-            'start_date': '2018-07-31',
-            'end_date': '2018-07-31',
-            'transaction_type': 'CREDIT'
+            'start_date': '2018-08-1',
+            'end_date': '2018-08-1',
+            'transaction_type': 1
         }
         transactions = get_transactions(filters, 1)
         self.assertEqual(len(transactions), 2)
 
     def test_get_transactions_start_date_end_date_user_id_and_type(self):
         filters = {
-            'start_date': '2018-07-31',
-            'end_date': '2018-07-31',
-            'transaction_type': 'DEBIT',
+            'start_date': '2018-08-1',
+            'end_date': '2018-08-1',
+            'transaction_type': 2,
             'user_id': '54759eb3c090d83409l2l889'
         }
         transactions = get_transactions(filters, 1)
@@ -514,14 +479,14 @@ class GetTransactionsTestCase(TestCase):
     def test_get_transactions_user_id_and_type(self):
         filters = {
             'user_id': '54759eb3c090d83409l2l889',
-            'transaction_type': 'DEBIT'
+            'transaction_type': 2
         }
         transactions = get_transactions(filters, 1)
         self.assertEqual(len(transactions), 1)
 
     def test_get_transactions_type(self):
         filters = {
-            'transaction_type': 'DEBIT'
+            'transaction_type': 2
         }
         transactions = get_transactions(filters, 1)
         self.assertEqual(len(transactions), 1)
@@ -529,8 +494,8 @@ class GetTransactionsTestCase(TestCase):
     def test_get_transactions_invalid_start_date(self):
         filters = {
             'start_date': '',
-            'end_date': '2018-07-31',
-            'transaction_type': 'DEBIT',
+            'end_date': '2018-08-1',
+            'transaction_type': 2,
             'user_id': '54759eb3c090d83409l2l889'
         }
         transactions = get_transactions(filters, 1)
@@ -538,9 +503,9 @@ class GetTransactionsTestCase(TestCase):
 
     def test_get_transactions_invalid_end_date(self):
         filters = {
-            'start_date': '2018-07-31',
+            'start_date': '2018-08-1',
             'end_date': '',
-            'transaction_type': 'DEBIT',
+            'transaction_type': 2,
             'user_id': '54759eb3c090d83409l2l889'
         }
         transactions = get_transactions(filters, 1)
@@ -548,8 +513,8 @@ class GetTransactionsTestCase(TestCase):
 
     def test_get_transactions_invalid_transaction_type(self):
         filters = {
-            'start_date': '2018-07-31',
-            'end_date': '2018-07-31',
+            'start_date': '2018-08-1',
+            'end_date': '2018-08-1',
             'transaction_type': '',
             'user_id': '54759eb3c090d83409l2l889'
         }
@@ -558,8 +523,8 @@ class GetTransactionsTestCase(TestCase):
 
     def test_get_transactions_invalid_user_id(self):
         filters = {
-            'start_date': '2018-07-31',
-            'end_date': '2018-07-31',
+            'start_date': '2018-08-1',
+            'end_date': '2018-08-1',
             'transaction_type': '',
             'user_id': ''
         }
@@ -575,29 +540,30 @@ class HandleTransactionDetailsTestCase(TestCase):
         data = {'user_id': '54759eb3c090d83409l2l889', 'currency': 'INR'}
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
-        TransactionType.objects.create(type_name='CREDIT')
-        TransactionType.objects.create(type_name='DEBIT')
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 195,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 295,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 95,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'DEBIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
 
     def test_handle_transactions_details_positive(self):
         filters = {
-            'start_date': '2018-07-31',
-            'end_date': '2018-07-31',
-            'transaction_type': 'DEBIT',
+            'start_date': '2018-08-1',
+            'end_date': '2018-08-1',
+            'transaction_type': 2,
             'user_id': '54759eb3c090d83409l2l889'
         }
         context, response_status = handle_transactions_details(filters, 1)
@@ -613,8 +579,8 @@ class HandleTransactionDetailsTestCase(TestCase):
     def test_handle_transactions_details_invalid_filters(self):
         filters = {
             'start_date': '',
-            'end_date': '2018-07-31',
-            'transaction_type': 'DEBIT',
+            'end_date': '2018-08-1',
+            'transaction_type': 2,
             'user_id': '54759eb3c090d83409l2l889'
         }
         context, response_status = handle_transactions_details(filters, 1)
@@ -840,11 +806,11 @@ class CheckCurrencyLimitChangeTestCase(TestCase):
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
 
-        TransactionType.objects.create(type_name='CREDIT')
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 800,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
 
     def test_check_currency_limit_change_reduce_limit(self):
@@ -893,12 +859,11 @@ class ExistingCurrencyTestCase(TestCase):
         data = {'user_id': '54759eb3c090d83409l2l889', 'currency': 'INR'}
         wallet_creation_data = get_wallet_creation_data(data)
         handle_create_wallet(wallet_creation_data)
-
-        TransactionType.objects.create(type_name='CREDIT')
+        wallet = Wallet.objects.get(wallet_id=wallet_creation_data['wallet_id'])
         data = {"user_id": "54759eb3c090d83409l2l889", "currency": "INR", "transaction_amount": 800,
                 "source": "Android", "payment_id": "1234", "transaction_remarks": "adding money"}
         transaction_type = 'CREDIT'
-        transaction_data = get_transaction_data(data, transaction_type)
+        transaction_data = get_transaction_data(data, transaction_type, wallet)
         handle_transact(transaction_data, transaction_type)
 
     def test_existing_currency_reduce_limit(self):
