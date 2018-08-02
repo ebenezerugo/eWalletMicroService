@@ -105,7 +105,6 @@ def update_currencies(request):
         logger.error(e)
         return JsonResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     context, response_status = handle_update_currencies(data)
-    print(context)
     return JsonResponse(context, status=response_status, safe=False)
 
 

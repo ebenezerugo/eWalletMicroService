@@ -1,8 +1,8 @@
-import logging
 from functools import wraps
 from datetime import datetime, time
 from django.db import connection
-from pprint import pprint
+import logging
+from pythonjsonlogger import jsonlogger
 
 logger = logging.getLogger('django.server')
 
