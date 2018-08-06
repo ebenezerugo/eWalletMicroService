@@ -88,7 +88,7 @@ LOGGING = {
     'disable_existing_loggers': True,
     'formatters': {
         'json': {
-            'format': '%(message)s %(lineno)d %(pathname)s',
+            'format': '%(message)s %(lineno)d %(pathname)s %(asctime)s',
             'class': 'pythonjsonlogger.jsonlogger.JsonFormatter'
         }
     },
